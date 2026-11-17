@@ -3,3 +3,17 @@
 .tracker{margin-top:20px}.tracker-head{display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap}.tracker-head label{margin:0}.chart-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-top:18px}.pie{width:164px;aspect-ratio:1;border-radius:50%;margin:12px auto 22px}.legend .line{align-items:center}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;text-align:left;font-size:14px}th,td{padding:10px 7px;border-bottom:1px solid #dce7f1;white-space:nowrap}td:not(:first-child),th:not(:first-child){text-align:right}.selected{background:#e7f1fb}.progress{width:100%;height:12px;accent-color:#5383b1}.goal-row{margin-bottom:18px}.goal-row:last-child{margin-bottom:0}.tracker .actions{justify-content:flex-start}.tracker h2{margin-bottom:8px}@media(max-width:680px){.chart-layout{grid-template-columns:1fr}}
 
 .expense-drilldown{cursor:pointer}.expense-drilldown::-webkit-details-marker{display:none}.extra-merchant{padding-left:18px}.expense-drilldown:focus-visible{outline:2px solid #5383b1;outline-offset:3px}.category-utilization{background:#eef5fb;border-radius:14px;padding:14px;margin:12px 0}.line span{overflow-wrap:anywhere}.line strong{flex-shrink:0}
+
+.pig-goal{display:grid;grid-template-columns:112px minmax(0,1fr);align-items:center;gap:12px;padding:8px 0}
+.pig-goal+.pig-goal{border-top:1px solid #dae5ef}.piggy{position:relative;width:112px;height:94px;color:#80516a}
+.piggy span{position:absolute;display:block}.pig-body{left:14px;top:28px;width:78px;height:51px;border:2px solid;border-radius:52% 48% 44% 48%;background:linear-gradient(to top,#eaa2bd var(--pig-fill),#ffebf2 var(--pig-fill))}
+.pig-ear{left:65px;top:23px;width:18px;height:19px;border:2px solid;border-radius:60% 20% 50% 40%;transform:rotate(-16deg);background:#fac6da}
+.pig-tail{left:3px;top:46px;width:16px;height:12px;border:2px solid;border-right:0;border-radius:50%;transform:rotate(24deg)}
+.pig-foot{top:71px;width:16px;height:14px;border:2px solid;border-radius:0 0 6px 6px;background:#fac6da}.pig-foot-left{left:26px}.pig-foot-right{left:67px}
+.pig-eye{left:58px;top:16px;width:5px;height:5px;border-radius:50%;background:#613d54}.pig-cheek{left:50px;top:24px;width:10px;height:6px;border-radius:50%;background:#f3a1bb}
+.pig-slot{left:23px;top:4px;width:23px;height:3px;border-radius:5px;background:#80516a}.pig-snout{left:83px;top:49px;width:22px;height:16px;border:2px solid;border-radius:6px;background:#f5bdd1}
+.pig-snout:after{content:'';position:absolute;top:4px;left:5px;width:2px;height:4px;border-radius:3px;background:#80516a;box-shadow:5px 0 #80516a}
+.pig-coin{left:44px;top:5px;width:19px;height:19px;border-radius:50%;background:#ffdf92;border:1px solid #ac7442;color:#754e2b;text-align:center;font-size:12px;font-weight:800;line-height:17px}
+.money-confetti{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden}.money-confetti span{position:absolute;top:-40px;left:var(--left);font-size:24px;animation:money-fall 1.65s ease-in both}
+@keyframes money-fall{to{transform:translate(var(--drift),105vh) rotate(var(--spin));opacity:.25}}
+@media(prefers-reduced-motion:reduce){.money-confetti{display:none}}

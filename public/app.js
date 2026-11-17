@@ -212,39 +212,89 @@ function charts(budget,key){
   get('pie').hidden=!expense;
   get('pie').style.background=budget.bills.length===1?palette[0]:expense?'conic-gradient('+stops.join(',')+')':'none';
   get('pieMonth').textContent=key?monthLabel(key):'Current budget';
+}
+function goalKey(name){
+  return name.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+}
+function matchGoal(subject,goals){
+  const key=goalKey(subject);
+  const exact=goals.filter(([name])=>goalKey(name)===key);
+  if(exact.length)return exact.length===1?exact[0]:null;
+  const words=text=>goalKey(text).split(' ').filter(word=>word&&!['my','the','a','savings','saving','fund','goal'].includes(word));
+  const requested=words(subject);
+  if(!requested.length)return null;
+  const matches=goals.filter(([name])=>{
+    const tokens=words(name);
+    return requested.every(word=>tokens.includes(word));
+  });
+  return matches.length===1?matches[0]:null;
+}
+function monthGoals(budget,month){
+  const goals=new Map(budget.goals.map(row=>[goalKey(row[0]),[...row]]));
+  for(const entry of expenses.get(month)||[]){
+    if(!entry.goal)continue;
+    const key=goalKey(entry.goal);
+    const current=goals.get(key)||[entry.goal,0,entry.target];
+    current[1]=(Math.round(current[1]*100)+entry.cents)/100;
+    goals.set(key,current);
+  }
+  return [...goals.values()];
+}
+function cumulativeGoals(budget,month){
   const goalTotals=new Map();
-  const budgets=[...history].sort(([a],[b])=>a.localeCompare(b))
-    .filter(([month])=>!key||month<=key).map(([,entry])=>entry);
-  if(!key&&!budgets.length)budgets.push(budget);
-  for(const entry of budgets){
-    for(const [name,amount,target] of entry.goals){
-      const normalized=name.toLowerCase();
+  const months=new Set([...history.keys(),...expenses.keys(),month]);
+  for(const key of [...months].sort()){
+    if(key>month)break;
+    const baseline=key===month?budget:history.get(key)||{goals:[]};
+    for(const [name,amount,target] of monthGoals(baseline,key)){
+      const normalized=goalKey(name);
       const previous=goalTotals.get(normalized);
-      goalTotals.set(normalized,[name,(previous?.[1]||0)+amount,target||previous?.[2]||0]);
+      goalTotals.set(normalized,[name,(Math.round((previous?.[1]||0)*100)+Math.round(amount*100))/100,target??previous?.[2]??0]);
     }
   }
+  return goalTotals;
+}
+function savingsText(amount,target){
+  return money(amount)+' saved'+(target?' of '+money(target)+' · '+Math.round(100*amount/target)+'%':' · No target set');
+}
+function renderSavings(goalTotals,month){
   const progress=get('goalProgress');
   progress.replaceChildren();
-  get('savingsNote').textContent=key?'Cumulative through '+monthLabel(key):history.size?'Cumulative across recorded months':'Current budget only';
+  get('savingsNote').textContent='Cumulative through '+monthLabel(month);
   if(!goalTotals.size)progress.textContent='Add a goal to start tracking your savings.';
   for(const [name,amount,target] of goalTotals.values()){
     const row=document.createElement('div');
-    row.className='goal-row';
+    row.className='pig-goal';
+    const pig=get('pigTemplate').content.firstElementChild.cloneNode(true);
+    const percent=target?Math.min(100,100*amount/target):0;
+    pig.style.setProperty('--pig-fill',percent+'%');
+    const text=document.createElement('div');
     const title=document.createElement('strong');
     title.textContent=name;
     const detail=document.createElement('div');
-    detail.textContent=money(amount)+' saved'+(target?' of '+money(target)+' · '+Math.round(100*amount/target)+'%':'');
-    row.append(title,detail);
-    if(target){
-      const bar=document.createElement('progress');
-      bar.className='progress';
-      bar.max=target;
-      bar.value=Math.min(amount,target);
-      bar.setAttribute('aria-label',name+' savings progress');
-      row.append(bar);
-    }
+    detail.textContent=savingsText(amount,target);
+    text.append(title,detail);
+    row.append(pig,text);
     progress.append(row);
   }
+}
+function celebrateSavings(){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const burst=document.createElement('div');
+  burst.className='money-confetti';
+  burst.setAttribute('aria-hidden','true');
+  const symbols=['💵','🪙','💸','✨'];
+  for(let i=0;i<24;i++){
+    const piece=document.createElement('span');
+    piece.textContent=symbols[i%symbols.length];
+    piece.style.setProperty('--left',Math.random()*95+'%');
+    piece.style.setProperty('--drift',(Math.random()*180-90)+'px');
+    piece.style.setProperty('--spin',(Math.random()*540-270)+'deg');
+    piece.style.animationDelay=Math.random()*.4+'s';
+    burst.append(piece);
+  }
+  document.body.append(burst);
+  setTimeout(()=>burst.remove(),2200);
 }
 function refreshHistory(key){
   const select=get('viewMonth');
@@ -262,7 +312,7 @@ function refreshHistory(key){
     button.textContent=monthLabel(month);
     button.onclick=()=>render(month);
     tr.insertCell().append(button);
-    totals(withExpenses(history.get(month),month)).forEach(value=>tr.insertCell().textContent=money(value));
+    totals(monthBudget(history.get(month),month)).forEach(value=>tr.insertCell().textContent=money(value));
   }
   if(!months.length){
     const cell=table.insertRow().insertCell();
@@ -290,10 +340,12 @@ function parseExpense(message){
   const matches=[...message.matchAll(amountPattern)];
   if(matches.length!==1)return null;
   const [full,number]=matches[0];
-  const subject=message.slice(matches[0].index+full.length).match(/^\s+(?:at|on|for)\s+(.+?)\s*[.!?]*$/i)?.[1]?.trim();
+  const subject=message.slice(matches[0].index+full.length).match(/^\s+(?:at|on|for|into|to|in)\s+(.+?)\s*[.!?]*$/i)?.[1]?.trim();
   const cents=Math.round(Number(number.replaceAll(',',''))*100);
   if(!subject||!/[\p{L}\p{N}]/u.test(subject)||!Number.isSafeInteger(cents)||cents<=0||cents>10000000000)return null;
-  return {subject,cents};
+  const savings=/\b(?:put|added|saved|deposited|contributed|transferred|set aside)\s*$/i.test(message.slice(0,matches[0].index))
+    || /^\s+into\s+/i.test(message.slice(matches[0].index+full.length));
+  return {subject,cents,savings};
 }
 function withExpenses(budget,month){
   const categoryUsage=new Map();
@@ -307,6 +359,7 @@ function withExpenses(budget,month){
   const assignments=new Map();
   let extra=0;
   for(const entry of expenses.get(month)||[]){
+    if(entry.goal)continue;
     const subject=entry.subject.toLowerCase();
     const usage=categoryUsage.get(subject)||categoryUsage.get(subject.split(/\s+at\s+/)[0]);
     if(usage){
@@ -324,16 +377,19 @@ function withExpenses(budget,month){
   if(extra)bills.push(['Extra',extra/100,true]);
   return {...budget,bills,categoryUsage,assignments,extraByMerchant:extraByMerchant.values()};
 }
+function monthBudget(budget,month){
+  return {...withExpenses(budget,month),goals:monthGoals(budget,month)};
+}
 function usageText({limit,spent}){
   const difference=limit-spent;
   const balance=difference>=0?money(difference/100)+' left':money(-difference/100)+' over budget';
   return money(spent/100)+' of '+money(limit/100)+' used ('+Math.round(100*spent/limit)+'%) · '+balance;
 }
-function renderExpenses(month,key,budget){
+function renderExpenses(month,key,budget,goalTotals){
   const entries=expenses.get(month)||[];
   const list=get('expenseList');
   list.replaceChildren();
-  get('expenseHint').textContent=monthLabel(month)+' · Name a budget category to track its spending, or enter a merchant to log it under Extra.';
+  get('expenseHint').textContent=monthLabel(month)+' · Try “I spent $60 on gas” or “I put $500 into my apartment fund.”';
   const utilization=get('categoryUtilization');
   utilization.replaceChildren();
   for(const usage of budget.categoryUsage.values()){
@@ -358,17 +414,18 @@ function renderExpenses(month,key,budget){
     row.className='line';
     const label=document.createElement('span');
     const category=budget.assignments.get(entry.id)?.name||'Extra';
-    label.textContent=entry.subject+' · '+money(entry.cents/100)+(entry.subject.toLowerCase()===category.toLowerCase()?'':' · '+category);
+    label.textContent=entry.goal?'Saved '+money(entry.cents/100)+' · '+entry.goal
+      :entry.subject+' · '+money(entry.cents/100)+(entry.subject.toLowerCase()===category.toLowerCase()?'':' · '+category);
     const remove=document.createElement('button');
     remove.type='button';
     remove.className='secondary';
     remove.textContent='Remove';
-    remove.setAttribute('aria-label','Remove '+entry.subject+' expense');
+    remove.setAttribute('aria-label','Remove '+(entry.goal?entry.goal+' contribution':entry.subject+' expense'));
     remove.onclick=()=>{
       expenses.set(month,entries.filter(item=>item.id!==entry.id));
       persist();
       render(key,false);
-      get('expenseStatus').textContent='Removed '+entry.subject+'.';
+      get('expenseStatus').textContent=entry.goal?'Removed contribution to '+entry.goal+'.':'Removed '+entry.subject+'.';
       get('expenseText').focus();
     };
     row.append(label,remove);
@@ -387,11 +444,26 @@ function renderExpenses(month,key,budget){
       get('expenseStatus').textContent='Use one dollar amount and a merchant or description, like “I just spent $25 at Starbucks.”';
       return;
     }
-    const entry={...expense,id:crypto.randomUUID()};
+    const entry={subject:expense.subject,cents:expense.cents,id:crypto.randomUUID()};
+    if(expense.savings){
+      const goal=matchGoal(expense.subject,[...goalTotals.values()]);
+      if(!goal){
+        get('expenseStatus').textContent='Use an existing savings goal name. If two goals sound alike, type the full name from Savings progress.';
+        return;
+      }
+      [entry.goal,,entry.target]=goal;
+    }
     expenses.set(month,[...entries,entry]);
     input.value='';
     persist();
     const updated=render(key,false);
+    if(entry.goal){
+      const [name,amount,target]=updated.goalTotals.get(goalKey(entry.goal));
+      get('expenseStatus').textContent='Added '+money(entry.cents/100)+' to '+name+'. '+savingsText(amount,target)+'.';
+      celebrateSavings();
+      input.focus();
+      return;
+    }
     const usage=updated.assignments.get(entry.id);
     get('expenseStatus').textContent='Logged '+money(expense.cents/100)+' for '+expense.subject+'.'
       +(usage?' '+usage.name+': '+usageText(usage)+'.':' Added to Extra.');
@@ -403,13 +475,17 @@ function render(key='',focus=true){
   get('ai').disabled=false;
   get('aiResult').textContent='';
   const month=key||currentMonth();
-  const budget=withExpenses(history.get(key)||collect(month),month);
+  const baseline=history.get(key)||collect(month);
+  const goalTotals=cumulativeGoals(baseline,month);
+  const budget=monthBudget(baseline,month);
+  budget.goalTotals=goalTotals;
   get('ai').onclick=()=>requestInsight(budget);
   get('expenseStatus').textContent='';
-  renderExpenses(month,key,budget);
+  renderExpenses(month,key,budget,goalTotals);
   const {income,bills,goals,contributions}=budget;
   refreshHistory(key);
   charts(budget,key);
+  renderSavings(goalTotals,month);
   const spent=sum(bills),saved=sum(goals),planned=spent+saved;
   const left=Math.round((income-planned)*100)/100;
   get('profile').textContent=budget.profile||collect().profile;

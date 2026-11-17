@@ -22,3 +22,5 @@ From this directory, run `python3 -m http.server 8000 --directory public` and op
 - The Add expenses form logs spending for the month being viewed. Name a funded budget category (for example, “I just spent $60 on gas”) to track usage against its allocation. Other entries are grouped under Extra in the expense chart, with merchant totals in its expandable legend. Extra spending and category overages reduce the remaining budget. Entries are saved in the same browser.
 - Each month stores one snapshot. Recording the same month updates it. Use the same goal name across months to accumulate contributions.
 - The budget check runs locally. The optional AI action sends monthly totals and amounts for standard categories to the Worker and Workers AI. Profile names, state, custom labels, goal names, and individual payroll deductions stay in the browser.
+
+- Log a savings contribution with “I put $500 into my apartment fund.” Daybreak matches an existing goal, saves the contribution for the displayed month, and includes it in cumulative progress and that month’s savings total. Enter each contribution once via chat or the setup form.

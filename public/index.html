@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Daybreak Budget</title>
-<link rel="stylesheet" href="/styles.css?v=3"><body>
+<link rel="stylesheet" href="/styles.css?v=4"><body>
 <header><span class="brand"><b>◒</b> Daybreak</span><button type="button" id="demo" class="secondary">Try sample dashboard</button></header>
 <main>
 <section class="layout" id="setup">
@@ -18,9 +18,9 @@
 <div class="actions"><span id="profile" class="pill"></span><button class="secondary" id="edit">Edit budget</button></div>
 <h1>Budget dashboard</h1><div class="tracker-head"><p id="summary" class="muted"></p><label>View month<select id="viewMonth"></select></label></div>
 <section class="tracker card" aria-labelledby="expenseTitle">
-<h2 id="expenseTitle">Add expenses</h2>
+<h2 id="expenseTitle">Log expenses or savings</h2>
 <p class="muted" id="expenseHint">Log an extra expense and see it come out of your remaining budget.</p>
-<form id="expenseForm"><label>Tell Daybreak what you spent<input id="expenseText" placeholder="I just spent $60 on gas" maxlength="180" required></label><button type="submit">Log expense</button></form>
+<form id="expenseForm"><label>Tell Daybreak what you spent or saved<input id="expenseText" placeholder="I just spent $60 on gas" maxlength="180" required></label><button type="submit">Log it</button></form>
 <p id="expenseStatus" class="muted" role="status"></p>
 <div id="categoryUtilization" class="category-utilization" aria-label="Category budget usage" hidden></div>
 <div id="expenseList"></div>
@@ -35,8 +35,18 @@
 <div class="card"><h2>Expenses by category</h2><small id="pieMonth"></small><div class="pie" id="pie" aria-hidden="true"></div><div id="pieLegend" class="legend"></div></div>
 <div class="card"><h2>Savings progress</h2><small id="savingsNote"></small><div id="goalProgress" class="tracker"></div></div>
 </div>
-<div class="grid detail"><div class="card"><h2>Where your pay goes</h2><div class="bar" aria-hidden="true"><i id="billBar"></i><i id="goalBar"></i></div><div id="breakdown"></div></div><div class="card insight"><span class="pill">Budget check</span><h2 id="status"></h2><p id="insight"></p><button type="button" class="secondary" id="ai">Get AI suggestions</button><p id="aiResult" role="status"></p><small>AI uses the selected budget’s totals and standard spending categories.</small></div><div class="card"><h2>Savings goals</h2><div id="goalList"></div></div><div class="card"><h2>Payroll contributions</h2><div id="contributions"></div></div></div>
+<div class="grid detail"><div class="card"><h2>Where your pay goes</h2><div class="bar" aria-hidden="true"><i id="billBar"></i><i id="goalBar"></i></div><div id="breakdown"></div></div><div class="card insight"><span class="pill">Budget check</span><h2 id="status"></h2><p id="insight"></p><button type="button" class="secondary" id="ai">Get AI suggestions</button><p id="aiResult" role="status"></p><small>AI uses the selected budget’s totals and standard spending categories.</small></div><div class="card"><h2>Savings this month</h2><div id="goalList"></div></div><div class="card"><h2>Payroll contributions</h2><div id="contributions"></div></div></div>
 </section>
 <footer><small>Budgets are saved in this browser. Sample data is kept separate.</small></footer>
 </main>
-<script src="/app.js?v=3" defer></script></body></html>
+<template id="pigTemplate">
+  <div class="piggy" aria-hidden="true">
+    <span class="pig-coin">$</span>
+    <span class="pig-ear"></span>
+    <span class="pig-tail"></span>
+    <span class="pig-foot pig-foot-left"></span><span class="pig-foot pig-foot-right"></span>
+    <span class="pig-body"><span class="pig-slot"></span><span class="pig-eye"></span><span class="pig-cheek"></span></span>
+    <span class="pig-snout"></span>
+  </div>
+</template>
+<script src="/app.js?v=4" defer></script></body></html>
