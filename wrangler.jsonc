@@ -1,0 +1,10 @@
+{
+  "name": "daybreak-budget",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-11-16",
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "ai": { "binding": "AI" },
+  "ratelimits": [
+    { "name": "INSIGHT_LIMIT", "namespace_id": "101", "simple": { "limit": 4, "period": 60 } }
+  ]
+}
