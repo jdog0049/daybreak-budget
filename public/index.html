@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Daybreak Budget</title>
+<link rel="stylesheet" href="/styles.css"><body>
+<header><span class="brand"><b>◒</b> Daybreak</span><button type="button" id="demo" class="secondary">Try sample dashboard</button></header>
+<main>
+<section class="layout" id="setup">
+<div class="intro"><span class="pill">Budget planner</span><h1>Make room for what matters.</h1><p class="muted">See what your pay covers, what you can save, and what’s left each month.</p></div>
+<form class="card" id="form">
+<div class="steps" aria-label="Setup progress"><span>1 · Paycheck</span><span>2 · Deductions</span><span>3 · Bills</span><span>4 · Goals</span></div>
+<section class="step"><h2>What does payday look like?</h2><label>Profile name<input id="name" placeholder="Your name (optional)" maxlength="40"></label><div class="row"><label>Paycheck amount ($)<input id="pay" type="number" min=".01" step=".01" placeholder="1,880.00" required></label><label>Pay frequency<select id="frequency"><option value="26">Every two weeks</option><option value="24">Twice a month</option><option value="52">Weekly</option><option value="12">Monthly</option></select></label></div><label>Paycheck type<select id="basis"><option value="net">Take-home pay</option><option value="gross">Gross pay</option></select></label><label>State for taxes<select id="state" required><option value="">Select your state</option></select></label></section>
+<section class="step" hidden><h2>What comes out of your pay?</h2><div class="row"><label>401(k) per paycheck ($)<input id="retirement" type="number" min="0" step=".01" placeholder="0"></label><label>HSA per paycheck ($)<input id="hsa" type="number" min="0" step=".01" placeholder="0"></label></div><label>Other payroll deductions per paycheck ($)<input id="other" type="number" min="0" step=".01" placeholder="0"></label><label id="taxField">Total tax withheld per paycheck ($)<input id="tax" type="number" min="0" step=".01" placeholder="Federal, state and payroll taxes"></label><p class="muted" id="deductionNote"></p></section>
+<section class="step" hidden><h2>What do you spend each month?</h2><div class="row" id="bills"></div><div id="extras"></div><button type="button" class="secondary" id="addBill">+ Add recurring bill</button></section>
+<section class="step" hidden><h2>What are you saving for?</h2><p class="muted">Enter the amount you saved this month and an optional target for each goal. Use the same goal name across months to track progress.</p><div id="goals"></div><button type="button" class="secondary" id="addGoal">+ Add savings goal</button></section>
+<div class="actions"><button type="button" class="secondary" id="back" hidden>Back</button><button type="submit" id="next">Continue</button></div>
+</form>
+</section>
+<section id="result" hidden tabindex="-1">
+<div class="actions"><span id="profile" class="pill"></span><button class="secondary" id="edit">Edit budget</button></div>
+<h1>Budget dashboard</h1><div class="tracker-head"><p id="summary" class="muted"></p><label>View month<select id="viewMonth"></select></label></div>
+<section class="tracker card">
+<div class="tracker-head"><div><h2>Month-by-month overview</h2><small id="historyNote"></small></div><label>Month to record<input id="recordMonth" type="month"></label><button id="record">Record current budget</button></div>
+<p id="recordMessage" role="status" class="muted"></p>
+<div class="table-wrap"><table><thead><tr><th scope="col">Month</th><th scope="col">Take-home</th><th scope="col">Expenses</th><th scope="col">Saved</th><th scope="col">Left</th></tr></thead><tbody id="history"></tbody></table></div>
+</section>
+<div class="grid dashboard"><div class="card"><small>Take-home pay</small><div class="money" id="income"></div></div><div class="card"><small>Bills + goals</small><div class="money" id="planned"></div></div><div class="card"><small>Left after goals</small><div class="money" id="left"></div></div></div>
+<div class="chart-layout">
+<div class="card"><h2>Expenses by category</h2><small id="pieMonth"></small><div class="pie" id="pie" aria-hidden="true"></div><div id="pieLegend" class="legend"></div></div>
+<div class="card"><h2>Savings progress</h2><small id="savingsNote"></small><div id="goalProgress" class="tracker"></div></div>
+</div>
+<div class="grid detail"><div class="card"><h2>Where your pay goes</h2><div class="bar" aria-hidden="true"><i id="billBar"></i><i id="goalBar"></i></div><div id="breakdown"></div></div><div class="card insight"><span class="pill">Budget check</span><h2 id="status"></h2><p id="insight"></p><button type="button" class="secondary" id="ai">Get AI suggestions</button><p id="aiResult" role="status"></p><small>AI uses the selected budget’s totals and standard spending categories.</small></div><div class="card"><h2>Savings goals</h2><div id="goalList"></div></div><div class="card"><h2>Payroll contributions</h2><div id="contributions"></div></div></div>
+</section>
+<footer><small>Budgets are saved in this browser. Sample data is kept separate.</small></footer>
+</main>
+<script src="/app.js" defer></script></body></html>
