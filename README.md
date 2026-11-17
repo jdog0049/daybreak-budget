@@ -18,6 +18,7 @@ From this directory, run `python3 -m http.server 8000 --directory public` and op
 ## Data and calculations
 
 - Each browser stores its own budget and monthly history locally. Clearing site data removes them. Sign-in and automatic device sync are outside this version.
-- Take-home periods normalize to a monthly average. Gross-pay entry uses the actual withholding and deductions from a pay stub. The state is saved on the budget profile.
+- Weekly and biweekly schedules count paydays in each calendar month from a known payday. Monthly and twice-monthly schedules count one and two checks respectively. Holiday shifts are not inferred. Older recorded budgets retain their original totals until updated. Gross-pay entry uses the actual withholding and deductions from a pay stub. The state is saved on the budget profile.
+- The Add expenses form logs extra spending by merchant or description for the month being viewed. Entries are saved in the same browser and deducted in addition to planned bills.
 - Each month stores one snapshot. Recording the same month updates it. Use the same goal name across months to accumulate contributions.
 - The budget check runs locally. The optional AI action sends monthly totals and amounts for standard categories to the Worker and Workers AI. Profile names, state, custom labels, goal names, and individual payroll deductions stay in the browser.

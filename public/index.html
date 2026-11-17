@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Daybreak Budget</title>
-<link rel="stylesheet" href="/styles.css"><body>
+<link rel="stylesheet" href="/styles.css?v=2"><body>
 <header><span class="brand"><b>◒</b> Daybreak</span><button type="button" id="demo" class="secondary">Try sample dashboard</button></header>
 <main>
 <section class="layout" id="setup">
 <div class="intro"><span class="pill">Budget planner</span><h1>Make room for what matters.</h1><p class="muted">See what your pay covers, what you can save, and what’s left each month.</p></div>
 <form class="card" id="form">
 <div class="steps" aria-label="Setup progress"><span>1 · Paycheck</span><span>2 · Deductions</span><span>3 · Bills</span><span>4 · Goals</span></div>
-<section class="step"><h2>What does payday look like?</h2><label>Profile name<input id="name" placeholder="Your name (optional)" maxlength="40"></label><div class="row"><label>Paycheck amount ($)<input id="pay" type="number" min=".01" step=".01" placeholder="1,880.00" required></label><label>Pay frequency<select id="frequency"><option value="26">Every two weeks</option><option value="24">Twice a month</option><option value="52">Weekly</option><option value="12">Monthly</option></select></label></div><label>Paycheck type<select id="basis"><option value="net">Take-home pay</option><option value="gross">Gross pay</option></select></label><label>State for taxes<select id="state" required><option value="">Select your state</option></select></label></section>
+<section class="step"><h2>What does payday look like?</h2><label>Profile name<input id="name" placeholder="Your name (optional)" maxlength="40"></label><div class="row"><label>Paycheck amount ($)<input id="pay" type="number" min=".01" step=".01" placeholder="1,880.00" required></label><label>Pay frequency<select id="frequency"><option value="26">Every two weeks</option><option value="24">Twice a month</option><option value="52">Weekly</option><option value="12">Monthly</option></select></label></div><label id="paydayField">A known payday<input id="payday" type="date"><small>Use a recent or upcoming payday on your regular schedule.</small></label><label>Paycheck type<select id="basis"><option value="net">Take-home pay</option><option value="gross">Gross pay</option></select></label><label>State for taxes<select id="state" required><option value="">Select your state</option></select></label></section>
 <section class="step" hidden><h2>What comes out of your pay?</h2><div class="row"><label>401(k) per paycheck ($)<input id="retirement" type="number" min="0" step=".01" placeholder="0"></label><label>HSA per paycheck ($)<input id="hsa" type="number" min="0" step=".01" placeholder="0"></label></div><label>Other payroll deductions per paycheck ($)<input id="other" type="number" min="0" step=".01" placeholder="0"></label><label id="taxField">Total tax withheld per paycheck ($)<input id="tax" type="number" min="0" step=".01" placeholder="Federal, state and payroll taxes"></label><p class="muted" id="deductionNote"></p></section>
 <section class="step" hidden><h2>What do you spend each month?</h2><div class="row" id="bills"></div><div id="extras"></div><button type="button" class="secondary" id="addBill">+ Add recurring bill</button></section>
 <section class="step" hidden><h2>What are you saving for?</h2><p class="muted">Enter the amount you saved this month and an optional target for each goal. Use the same goal name across months to track progress.</p><div id="goals"></div><button type="button" class="secondary" id="addGoal">+ Add savings goal</button></section>
@@ -17,6 +17,13 @@
 <section id="result" hidden tabindex="-1">
 <div class="actions"><span id="profile" class="pill"></span><button class="secondary" id="edit">Edit budget</button></div>
 <h1>Budget dashboard</h1><div class="tracker-head"><p id="summary" class="muted"></p><label>View month<select id="viewMonth"></select></label></div>
+<section class="tracker card" aria-labelledby="expenseTitle">
+<h2 id="expenseTitle">Add expenses</h2>
+<p class="muted" id="expenseHint">Log an extra expense and see it come out of your remaining budget.</p>
+<form id="expenseForm"><label>Tell Daybreak what you spent<input id="expenseText" placeholder="I just spent $25 at Starbucks" maxlength="180" required></label><button type="submit">Log expense</button></form>
+<p id="expenseStatus" class="muted" role="status"></p>
+<div id="expenseList"></div>
+</section>
 <section class="tracker card">
 <div class="tracker-head"><div><h2>Month-by-month overview</h2><small id="historyNote"></small></div><label>Month to record<input id="recordMonth" type="month"></label><button id="record">Record current budget</button></div>
 <p id="recordMessage" role="status" class="muted"></p>
@@ -31,4 +38,4 @@
 </section>
 <footer><small>Budgets are saved in this browser. Sample data is kept separate.</small></footer>
 </main>
-<script src="/app.js" defer></script></body></html>
+<script src="/app.js?v=2" defer></script></body></html>

@@ -48,9 +48,17 @@ function showStep(index){
     badge.classList.toggle('active',i===index);
     if(i===index)badge.setAttribute('aria-current','step');else badge.removeAttribute('aria-current');
   });
+  updatePaydayField();
   get('back').hidden=!index;
   get('next').textContent=index===3?'Create my profile':'Continue';
 }
+function updatePaydayField(){
+  const required=['26','52'].includes(get('frequency').value);
+  get('paydayField').hidden=!required;
+  get('payday').required=required;
+  get('payday').disabled=!required||step!==0;
+}
+get('frequency').onchange=updatePaydayField;
 get('back').onclick=()=>showStep(step-1);
 get('form').onsubmit=e=>{
   e.preventDefault();
@@ -87,14 +95,31 @@ function list(id,items,empty){
     target.append(row);
   });
 }
-function collect(){
-  const monthly=Number(get('frequency').value)/12;
+const dayMs=86400000;
+const shortDate=new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
+function scheduledPaydays(month,anchor,interval){
+  const start=Date.parse(month+'-01T00:00:00Z');
+  const next=new Date(start);
+  next.setUTCMonth(next.getUTCMonth()+1);
+  const payday=Date.parse(anchor+'T00:00:00Z');
+  if(!Number.isFinite(payday))return [];
+  const cycle=interval*dayMs;
+  const first=payday+Math.ceil((start-payday)/cycle)*cycle;
+  const dates=[];
+  for(let date=first;date<next.getTime();date+=cycle)dates.push(date);
+  return dates;
+}
+function collect(month=currentMonth()){
+  const frequency=value('frequency');
+  const interval=frequency===26?14:frequency===52?7:0;
+  const dates=interval?scheduledPaydays(month,get('payday').value,interval):[];
+  const monthly=interval?dates.length:frequency/12;
   const contributions=[['401(k)',value('retirement')*monthly],['HSA',value('hsa')*monthly],['Other deductions',value('other')*monthly]];
   const gross=get('basis').value==='gross';
   const income=Math.round((value('pay')*monthly-(gross?sum(contributions)+value('tax')*monthly:0))*100)/100;
   const bills=[...categories.map((name,i)=>[name,value('bill'+i)]),...rows('extras')].filter(item=>item[1]>0);
   const goals=rows('goals');
-  return {income,bills,goals,contributions,profile:(get('name').value.trim()||'My budget')+' · '+get('state').value};
+  return {income,bills,goals,contributions,paycheckCount:monthly,paydays:dates,profile:(get('name').value.trim()||'My budget')+' · '+get('state').value};
 }
 const storageKey='daybreak-budget-v1';
 function readSaved(){
@@ -103,9 +128,10 @@ function readSaved(){
 }
 let saved=readSaved();
 let history=new Map(saved.history||[]);
+let expenses=new Map(saved.expenses||[]);
 function snapshot(){
   return {
-    fields:Object.fromEntries(['name','pay','frequency','basis','state','retirement','hsa','other','tax']
+    fields:Object.fromEntries(['name','pay','frequency','basis','state','retirement','hsa','other','tax','payday']
       .map(id=>[id,get(id).value])),
     bills:categories.map((_,index)=>get('bill'+index).value),
     extras:rows('extras'),
@@ -125,7 +151,7 @@ function restore(data){
 }
 function persist(){
   if(sampleMode)return;
-  saved={draft:snapshot(),history:[...history]};
+  saved={draft:snapshot(),history:[...history],expenses:[...expenses]};
   try {localStorage.setItem(storageKey,JSON.stringify(saved));}
   catch {get('recordMessage').textContent='Browser storage is unavailable. Changes will be lost when you close this page.';}
 }
@@ -133,8 +159,11 @@ const formatter=new Intl.DateTimeFormat('en-US',{month:'short',year:'numeric',ti
 const monthLabel=key=>formatter.format(new Date(key+'-01T00:00:00Z'));
 const totals=budget=>[budget.income,sum(budget.bills),sum(budget.goals),budget.income-sum(budget.bills)-sum(budget.goals)];
 const today=new Date();
-get('recordMonth').value=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0');
-const palette=['#c76d54','#598ab7','#8070a8','#4f968b','#ba8648','#b96f90','#75849a','#8d9255'];
+function currentMonth(date=new Date()){
+  return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0');
+}
+get('recordMonth').value=currentMonth();
+const palette=['#f7bca9','#a9d3f4','#cbb9eb','#a8dccb','#f5dda2','#f0bad6','#b5c2ea','#cfe0a5'];
 let sampleMode=false;
 function charts(budget,key){
   const expense=sum(budget.bills);
@@ -199,7 +228,7 @@ function charts(budget,key){
 }
 function refreshHistory(key){
   const select=get('viewMonth');
-  select.replaceChildren(new Option('Current budget',''));
+  select.replaceChildren(new Option('Current budget · '+monthLabel(currentMonth()),''));
   const table=get('history');
   table.replaceChildren();
   const months=[...history.keys()].sort().reverse();
@@ -213,7 +242,7 @@ function refreshHistory(key){
     button.textContent=monthLabel(month);
     button.onclick=()=>render(month);
     tr.insertCell().append(button);
-    totals(history.get(month)).forEach(value=>tr.insertCell().textContent=money(value));
+    totals(withExpenses(history.get(month),month)).forEach(value=>tr.insertCell().textContent=money(value));
   }
   if(!months.length){
     const cell=table.insertRow().insertCell();
@@ -231,24 +260,97 @@ get('record').onclick=()=>{
     return;
   }
   const exists=history.has(key);
-  history.set(key,collect());
+  history.set(key,collect(key));
   get('recordMessage').textContent=monthLabel(key)+(exists?' updated with the current budget.':' recorded.');
   persist();
   render(key);
 };
-function render(key=''){
+function parseExpense(message){
+  const amountPattern=/\$\s*((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?)(?![\d.,])/g;
+  const matches=[...message.matchAll(amountPattern)];
+  if(matches.length!==1)return null;
+  const [full,number]=matches[0];
+  const subject=message.slice(matches[0].index+full.length).match(/^\s+(?:at|on|for)\s+(.+?)\s*[.!?]*$/i)?.[1]?.trim();
+  const cents=Math.round(Number(number.replaceAll(',',''))*100);
+  if(!subject||!/[\p{L}\p{N}]/u.test(subject)||!Number.isSafeInteger(cents)||cents<=0||cents>10000000000)return null;
+  return {subject,cents};
+}
+function withExpenses(budget,month){
+  const logged=expenses.get(month)||[];
+  if(!logged.length)return budget;
+  const centsByName=new Map();
+  for(const {subject,cents} of logged){
+    const name='Extra · '+subject;
+    centsByName.set(name,(centsByName.get(name)||0)+cents);
+  }
+  const bills=[...budget.bills,...Array.from(centsByName,([name,cents])=>[name,cents/100])];
+  return {...budget,bills};
+}
+function renderExpenses(month,key){
+  const entries=expenses.get(month)||[];
+  const list=get('expenseList');
+  list.replaceChildren();
+  get('expenseHint').textContent='Extra expenses for '+monthLabel(month)+' are deducted in addition to planned bills.';
+  for(const entry of [...entries].reverse()){
+    const row=document.createElement('div');
+    row.className='line';
+    const label=document.createElement('span');
+    label.textContent=entry.subject+' · '+money(entry.cents/100);
+    const remove=document.createElement('button');
+    remove.type='button';
+    remove.className='secondary';
+    remove.textContent='Remove';
+    remove.setAttribute('aria-label','Remove '+entry.subject+' expense');
+    remove.onclick=()=>{
+      expenses.set(month,entries.filter(item=>item.id!==entry.id));
+      persist();
+      render(key,false);
+      get('expenseStatus').textContent='Removed '+entry.subject+'.';
+      get('expenseText').focus();
+    };
+    row.append(label,remove);
+    list.append(row);
+  }
+  get('expenseForm').onsubmit=event=>{
+    event.preventDefault();
+    if(!key&&month!==currentMonth()){
+      render('',false);
+      get('expenseStatus').textContent='The calendar month changed. Submit again to log the expense in '+monthLabel(currentMonth())+'.';
+      return;
+    }
+    const input=get('expenseText');
+    const expense=parseExpense(input.value);
+    if(!expense){
+      get('expenseStatus').textContent='Use one dollar amount and a merchant or description, like “I just spent $25 at Starbucks.”';
+      return;
+    }
+    expenses.set(month,[...entries,{...expense,id:crypto.randomUUID()}]);
+    input.value='';
+    persist();
+    render(key,false);
+    get('expenseStatus').textContent='Logged '+money(expense.cents/100)+' for '+expense.subject+'.';
+    input.focus();
+  };
+}
+function render(key='',focus=true){
   insightRequest?.abort();
   get('ai').disabled=false;
   get('aiResult').textContent='';
-  get('ai').onclick=()=>requestInsight(history.get(key)||collect());
-  const budget=history.get(key)||collect();
+  const month=key||currentMonth();
+  const budget=withExpenses(history.get(key)||collect(month),month);
+  get('ai').onclick=()=>requestInsight(budget);
+  get('expenseStatus').textContent='';
+  renderExpenses(month,key);
   const {income,bills,goals,contributions}=budget;
   refreshHistory(key);
   charts(budget,key);
   const spent=sum(bills),saved=sum(goals),planned=spent+saved;
   const left=Math.round((income-planned)*100)/100;
   get('profile').textContent=budget.profile||collect().profile;
-  get('summary').textContent=key?'Recorded budget for '+monthLabel(key)+'.':'Average monthly amounts based on '+get('frequency').selectedOptions[0].textContent.toLowerCase()+' pay.';
+  const count=budget.paycheckCount;
+  const schedule=count===undefined?'Saved budget snapshot':count+' scheduled '+(count===1?'paycheck':'paychecks');
+  const dates=budget.paydays?.length?' · '+budget.paydays.map(date=>shortDate.format(date)).join(', '):'';
+  get('summary').textContent=monthLabel(month)+' · '+schedule+dates;
   get('income').textContent=money(income);
   get('planned').textContent=money(planned);
   get('left').textContent=money(left);
@@ -262,10 +364,10 @@ function render(key=''){
   const flexible=bills.filter(([name])=>['Groceries','Gas','Subscriptions','Dining out'].includes(name)).sort((a,b)=>b[1]-a[1])[0];
   get('status').textContent=!planned?'Add your monthly expenses':left<0?'Your plan is over budget':left<income*.1?'Your plan has a small cushion':'Your plan has room left';
   const next=flexible?' Review '+flexible[0].toLowerCase()+' ('+money(flexible[1])+'/month) for any realistic reductions.':' Review recurring bills and check whether any goal amounts can be adjusted.';
-  get('insight').textContent=!planned?'Enter recurring expenses or savings goals to see how much of your pay they use.':left<0?'Your bills and goals exceed take-home pay by '+money(-left)+' a month.'+next:left<income*.1?'You have '+money(left)+' left for irregular expenses each month.'+next:'Your listed bills and goals fit within your average monthly pay, with '+money(left)+' left for irregular expenses or additional savings.';
+  get('insight').textContent=!planned?'Enter recurring expenses or savings goals to see how much of your pay they use.':left<0?'Your bills and goals exceed take-home pay by '+money(-left)+' a month.'+next:left<income*.1?'You have '+money(left)+' left for irregular expenses each month.'+next:'Your listed bills and goals fit within your scheduled pay, with '+money(left)+' left for irregular expenses or additional savings.';
   get('setup').hidden=true;
   get('result').hidden=false;
-  get('result').focus();
+  if(focus)get('result').focus();
 }
 get('edit').onclick=()=>{
   get('result').hidden=true;
@@ -300,15 +402,16 @@ get('demo').onclick=()=>{
     sampleMode=false;
     get('demo').textContent='Try sample dashboard';
     history=new Map(saved.history||[]);
+    expenses=new Map(saved.expenses||[]);
     restore(saved.draft);
     get('recordMessage').textContent='';
-    if(saved.draft)render();
-    else get('edit').click();
+    openSavedBudget();
     return;
   }
   get('demo').textContent='Exit sample dashboard';
   history=new Map();
-  const sample={name:'Sample budget',pay:1880,frequency:26,state:'Florida',basis:'net',retirement:95,hsa:25,other:0,tax:0};
+  expenses=new Map();
+  const sample={name:'Sample budget',pay:1880,frequency:26,payday:'2026-11-13',state:'Florida',basis:'net',retirement:95,hsa:25,other:0,tax:0};
   Object.entries(sample).forEach(([id,amount])=>get(id).value=amount);
   [1950,0,310,100,120,60,35,200].forEach((amount,index)=>get('bill'+index).value=amount);
   get('extras').replaceChildren();
@@ -320,7 +423,7 @@ get('demo').onclick=()=>{
   for(let offset=0;offset<4;offset++){
     const date=new Date(today.getFullYear(),today.getMonth()-offset,1);
     const key=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0');
-    const budget=collect();
+    const budget=collect(key);
     budget.bills=budget.bills.map(([name,amount])=>[name,amount+(name==='Groceries'?offset*18:name==='Dining out'?-offset*22:0)]);
     budget.goals=budget.goals.map(([name,amount,target])=>[name,amount-offset*20,target]);
     history.set(key,budget);
@@ -330,4 +433,17 @@ get('demo').onclick=()=>{
 };
 showStep(0);
 
-if(saved.draft){restore(saved.draft);render();}
+function openSavedBudget(){
+  if(saved.draft&&(!['26','52'].includes(get('frequency').value)||get('payday').value))render();
+  else {
+    get('edit').click();
+    if(saved.draft)get('payday').focus();
+  }
+}
+if(saved.draft){restore(saved.draft);openSavedBudget();}
+let displayedMonth=currentMonth();
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden||displayedMonth===currentMonth())return;
+  displayedMonth=currentMonth();
+  if(!get('result').hidden&&!get('viewMonth').value)render('',false);
+});
