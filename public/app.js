@@ -171,7 +171,7 @@ function charts(budget,key){
   const legend=get('pieLegend');
   legend.replaceChildren();
   let start=0;
-  budget.bills.forEach(([name,amount],index)=>{
+  budget.bills.forEach(([name,amount,isExtra],index)=>{
     const color=palette[index%palette.length];
     const end=start+100*amount/expense;
     stops.push(color+' '+start+'% '+end+'%');
@@ -185,8 +185,28 @@ function charts(budget,key){
     label.append(dot,name);
     const number=document.createElement('strong');
     number.textContent=money(amount)+' · '+Math.round(100*amount/expense)+'%';
-    row.append(label,number);
-    legend.append(row);
+    if(isExtra){
+      const details=document.createElement('details');
+      const summary=document.createElement('summary');
+      summary.className='line expense-drilldown';
+      label.append(' ▾');
+      summary.append(label,number);
+      details.append(summary);
+      for(const [subject,cents] of budget.extraByMerchant){
+        const line=document.createElement('div');
+        line.className='line extra-merchant';
+        const merchant=document.createElement('span');
+        const price=document.createElement('strong');
+        merchant.textContent=subject;
+        price.textContent=money(cents/100);
+        line.append(merchant,price);
+        details.append(line);
+      }
+      legend.append(details);
+    }else{
+      row.append(label,number);
+      legend.append(row);
+    }
   });
   if(!expense)legend.textContent='Add expenses to see a category breakdown.';
   get('pie').hidden=!expense;
@@ -276,26 +296,69 @@ function parseExpense(message){
   return {subject,cents};
 }
 function withExpenses(budget,month){
-  const logged=expenses.get(month)||[];
-  if(!logged.length)return budget;
-  const centsByName=new Map();
-  for(const {subject,cents} of logged){
-    const name='Extra · '+subject;
-    centsByName.set(name,(centsByName.get(name)||0)+cents);
+  const categoryUsage=new Map();
+  for(const [name,amount] of budget.bills){
+    const key=name.trim().toLowerCase();
+    const usage=categoryUsage.get(key)||{name,limit:0,spent:0};
+    usage.limit+=Math.round(amount*100);
+    categoryUsage.set(key,usage);
   }
-  const bills=[...budget.bills,...Array.from(centsByName,([name,cents])=>[name,cents/100])];
-  return {...budget,bills};
+  const extraByMerchant=new Map();
+  const assignments=new Map();
+  let extra=0;
+  for(const entry of expenses.get(month)||[]){
+    const subject=entry.subject.toLowerCase();
+    const usage=categoryUsage.get(subject)||categoryUsage.get(subject.split(/\s+at\s+/)[0]);
+    if(usage){
+      usage.spent+=entry.cents;
+      assignments.set(entry.id,usage);
+    }else{
+      const merchant=extraByMerchant.get(subject)||[entry.subject,0];
+      merchant[1]+=entry.cents;
+      extraByMerchant.set(subject,merchant);
+      extra+=entry.cents;
+    }
+  }
+  // Planned spending already reserves each category's full amount.
+  const bills=[...categoryUsage.values()].map(({name,limit,spent})=>[name,Math.max(limit,spent)/100]);
+  if(extra)bills.push(['Extra',extra/100,true]);
+  return {...budget,bills,categoryUsage,assignments,extraByMerchant:extraByMerchant.values()};
 }
-function renderExpenses(month,key){
+function usageText({limit,spent}){
+  const difference=limit-spent;
+  const balance=difference>=0?money(difference/100)+' left':money(-difference/100)+' over budget';
+  return money(spent/100)+' of '+money(limit/100)+' used ('+Math.round(100*spent/limit)+'%) · '+balance;
+}
+function renderExpenses(month,key,budget){
   const entries=expenses.get(month)||[];
   const list=get('expenseList');
   list.replaceChildren();
-  get('expenseHint').textContent='Extra expenses for '+monthLabel(month)+' are deducted in addition to planned bills.';
+  get('expenseHint').textContent=monthLabel(month)+' · Name a budget category to track its spending, or enter a merchant to log it under Extra.';
+  const utilization=get('categoryUtilization');
+  utilization.replaceChildren();
+  for(const usage of budget.categoryUsage.values()){
+    if(!usage.spent)continue;
+    const item=document.createElement('div');
+    item.className='goal-row';
+    const title=document.createElement('strong');
+    title.textContent=usage.name;
+    const detail=document.createElement('div');
+    detail.textContent=usageText(usage);
+    const bar=document.createElement('progress');
+    bar.className='progress';
+    bar.value=Math.min(usage.spent,usage.limit);
+    bar.max=usage.limit;
+    bar.setAttribute('aria-label',usage.name+' budget used');
+    item.append(title,detail,bar);
+    utilization.append(item);
+  }
+  utilization.hidden=!utilization.childElementCount;
   for(const entry of [...entries].reverse()){
     const row=document.createElement('div');
     row.className='line';
     const label=document.createElement('span');
-    label.textContent=entry.subject+' · '+money(entry.cents/100);
+    const category=budget.assignments.get(entry.id)?.name||'Extra';
+    label.textContent=entry.subject+' · '+money(entry.cents/100)+(entry.subject.toLowerCase()===category.toLowerCase()?'':' · '+category);
     const remove=document.createElement('button');
     remove.type='button';
     remove.className='secondary';
@@ -324,11 +387,14 @@ function renderExpenses(month,key){
       get('expenseStatus').textContent='Use one dollar amount and a merchant or description, like “I just spent $25 at Starbucks.”';
       return;
     }
-    expenses.set(month,[...entries,{...expense,id:crypto.randomUUID()}]);
+    const entry={...expense,id:crypto.randomUUID()};
+    expenses.set(month,[...entries,entry]);
     input.value='';
     persist();
-    render(key,false);
-    get('expenseStatus').textContent='Logged '+money(expense.cents/100)+' for '+expense.subject+'.';
+    const updated=render(key,false);
+    const usage=updated.assignments.get(entry.id);
+    get('expenseStatus').textContent='Logged '+money(expense.cents/100)+' for '+expense.subject+'.'
+      +(usage?' '+usage.name+': '+usageText(usage)+'.':' Added to Extra.');
     input.focus();
   };
 }
@@ -340,7 +406,7 @@ function render(key='',focus=true){
   const budget=withExpenses(history.get(key)||collect(month),month);
   get('ai').onclick=()=>requestInsight(budget);
   get('expenseStatus').textContent='';
-  renderExpenses(month,key);
+  renderExpenses(month,key,budget);
   const {income,bills,goals,contributions}=budget;
   refreshHistory(key);
   charts(budget,key);
@@ -368,6 +434,7 @@ function render(key='',focus=true){
   get('setup').hidden=true;
   get('result').hidden=false;
   if(focus)get('result').focus();
+  return budget;
 }
 get('edit').onclick=()=>{
   get('result').hidden=true;
